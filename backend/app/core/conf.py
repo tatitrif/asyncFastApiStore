@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     port: int = 9000
     reload: bool = False
 
+    # db
+    db_echo: bool = True
+    sqlite_filename: str = "db_project"
+    sqlite_database_uri: str = f"sqlite+aiosqlite:///./{sqlite_filename}.db"
+    sqlalchemy_database_uri: str = sqlite_database_uri
+
 
 @lru_cache
 def get_settings():

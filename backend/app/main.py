@@ -1,8 +1,22 @@
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 
-from core.conf import settings
+from api.v1 import item
+from core.conf import settings, logger
+from core.database import create_tables
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    logger.info("Start configuring server...")
+    await create_tables()
+    logger.info("Server started and configured successfully")
+    yield
+    logger.info("Server shut down")
 
 
 def get_app() -> FastAPI:
@@ -10,7 +24,9 @@ def get_app() -> FastAPI:
         title=settings.project_title,
         description=settings.project_description,
         default_response_class=ORJSONResponse,
+        lifespan=lifespan,
     )
+    app.include_router(item.router, prefix=settings.api_v1_str)
 
     return app
 

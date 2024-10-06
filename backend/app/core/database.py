@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from core.conf import settings, logger
+from models.base import MappedBase
 
 
 def create_engine_and_session(
@@ -40,3 +41,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, Any]:
 
     async with async_db_session() as session:
         yield session
+
+
+async def create_tables():
+    """Create database tables"""
+    async with async_engine.begin() as coon:
+        await coon.run_sync(MappedBase.metadata.create_all)
