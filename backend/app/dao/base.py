@@ -20,7 +20,7 @@ class BaseDAO:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def find_one_or_none(self, _id: int):
+    async def find_one_or_none(self, **kwargs):
         """
         Асинхронно находит и возвращает один экземпляр модели по указанным критериям или None.
 
@@ -31,11 +31,11 @@ class BaseDAO:
             Экземпляр модели или None, если ничего не найдено.
         """
 
-        query = select(self.model).filter_by(id=_id)
+        query = select(self.model).filter_by(**kwargs)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_all_by_page(
+    async def find_all_by_page(
         self, limit: int, offset: int = 0, **kwargs
     ) -> tuple[dict, Sequence[Type[model]]]:
         """
@@ -52,7 +52,7 @@ class BaseDAO:
         query = select(self.model).filter_by(**kwargs)
         query_count = select(func.count(self.model.id)).filter_by(**kwargs)
 
-        query = query.limit(limit).offset(offset)
+        query = query.limit(limit).offset(offset - 1)
         res: Result = await self.session.execute(query)
         res_count: Result = await self.session.execute(query_count)
         page_entities = res.unique().scalars().all()

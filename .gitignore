@@ -1,3 +1,5 @@
+backend/app/uploads/*
+backend/app/*.db
 *.idea
 *.lock
 */app/*.toml

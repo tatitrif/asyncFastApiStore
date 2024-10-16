@@ -17,10 +17,12 @@ router = APIRouter(prefix="/items", tags=["items"])
     response_model=schemas.ItemResponse,
 )
 async def _get_one_by_id(item_id: int, session: AsyncSession = Depends(get_db)):
-    entity = await dao.ItemsDAO(session).find_one_or_none(item_id)
+    entity = await dao.ItemsDAO(session).find_one_or_none(id=item_id)
     if entity:
         return entity
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found {id}")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
+    )
 
 
 @router.get(
@@ -31,7 +33,7 @@ async def _get_many(
     page_params: dict = Depends(pagination),
     session: AsyncSession = Depends(get_db),
 ):
-    pagination_info, page_entities = await dao.ItemsDAO(session).get_all_by_page(
+    pagination_info, page_entities = await dao.ItemsDAO(session).find_all_by_page(
         **page_params
     )
     if not page_entities:
@@ -90,13 +92,18 @@ async def _update_one_by_id(
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    if await dao.ItemsDAO(session).find_one_or_none(item_id):
+    if await dao.ItemsDAO(session).find_one_or_none(id=item_id):
         return await dao.ItemsDAO(session).update_one_by_id(item_id, **data)
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found {id}")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
+    )
 
 
 @router.delete("/{item_id}")
 async def _delete_by_id(item_id: int, session: AsyncSession = Depends(get_db)):
-    if await dao.ItemsDAO(session).find_one_or_none(item_id):
-        return await dao.ItemsDAO(session).delete(id=item_id)
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found {id}")
+    if await dao.ItemsDAO(session).find_one_or_none(id=item_id):
+        if await dao.ItemsDAO(session).delete(id=item_id):
+            return {"detail": f"Deleted {item_id}"}
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
+    )
