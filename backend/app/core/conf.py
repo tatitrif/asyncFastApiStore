@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     sqlite_database_uri: str = f"sqlite+aiosqlite:///./{sqlite_filename}.db"
     sqlalchemy_database_uri: str = sqlite_database_uri
 
+    # auth
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24
+
 
 @lru_cache
 def get_settings():

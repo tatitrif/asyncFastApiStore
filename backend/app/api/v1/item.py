@@ -2,9 +2,11 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_db
+from dependencies.user import check_admin_role
+from dependencies.database import get_db
 from dao import item as dao
 from helpers.paginator import pagination
+
 from helpers.upload import handle_file_upload
 from schemas import item as schemas
 from schemas.base import PageInfo, Page
@@ -50,6 +52,7 @@ async def _get_many(
     "/",
     response_model=schemas.ItemResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(check_admin_role)],
 )
 async def _create_one(
     item: schemas.ItemRequest = Depends(),
@@ -69,6 +72,7 @@ async def _create_one(
 @router.patch(
     "/{item_id}",
     response_model=schemas.ItemResponse,
+    dependencies=[Depends(check_admin_role)],
 )
 async def _update_one_by_id(
     item_id: int,
@@ -99,11 +103,14 @@ async def _update_one_by_id(
     )
 
 
-@router.delete("/{item_id}")
+@router.delete(
+    "/{item_id}",
+    dependencies=[Depends(check_admin_role)],
+)
 async def _delete_by_id(item_id: int, session: AsyncSession = Depends(get_db)):
     if await dao.ItemsDAO(session).find_one_or_none(id=item_id):
         if await dao.ItemsDAO(session).delete(id=item_id):
-            return {"detail": f"Deleted {item_id}"}
+            return {"detail": f"Deleted id={item_id}"}
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
     )

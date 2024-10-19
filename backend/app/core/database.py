@@ -1,5 +1,4 @@
 import sys
-from typing import AsyncGenerator, Any
 
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
@@ -32,15 +31,6 @@ def create_engine_and_session(
 async_engine, async_db_session = create_engine_and_session(
     settings.sqlalchemy_database_uri
 )
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, Any]:
-    """
-    Returns a database Session for use with fastapi Depends
-    """
-
-    async with async_db_session() as session:
-        yield session
 
 
 async def create_tables():
