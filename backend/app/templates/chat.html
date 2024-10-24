@@ -3,7 +3,7 @@
 {% block content %}
 <h1>WebSocket Chat</h1>
 <h3>Hi,</h3>
-<form id="loginForm" onsubmit="loginUser(event)">
+<form id="loginForm" onsubmit="loginUser(event)" style="display: none">
     <input type="text" id="username"/>
     <input type="password" id="password"/>
     <button>Login</button>
@@ -13,7 +13,7 @@
 </ul>
 <form id="chatForm" onsubmit="sendMessage(event)" style="display: none">
     <label for="messageSendTo">Message to</label>
-    <select id="messageSendTo" onmouseenter="handleSendToChange(event)">
+    <select id="messageSendTo" onMouseEnter="handleSendToChange(event)">
         <option value="all">All</option>
     </select>
     <label for="messageText"></label>
@@ -27,19 +27,26 @@
     const http_scheme = window.location.protocol === "https:" ? "https" : "http";
     let token = localStorage.getItem("access_token")
 
-    if (token) {
-        const loginForm = document.getElementById('loginForm');
-        loginForm.style.display = 'none';
-        const chatForm = document.getElementById('chatForm');
-        chatForm.style.display = 'block';
-        getMessage()
-    } else {
-        const loginForm = document.getElementById('loginForm');
-        loginForm.style.display = 'block';
-        const chatForm = document.getElementById('chatForm');
-        chatForm.style.display = 'none';
+    response = fetch(http_scheme + "://" + window.location.host + url_api + "/chat/messages?token=" + token, {
+        method: 'GET'
+    })
+        .then(function (response) {
+            if (!response.ok) {
 
-    }
+                loginForm.style.display = 'block';
+                const chatForm = document.getElementById('chatForm');
+                chatForm.style.display = 'none';
+            } else {
+
+                const loginForm = document.getElementById('loginForm');
+                loginForm.style.display = 'none';
+                const chatForm = document.getElementById('chatForm');
+                chatForm.style.display = 'block';
+                getMessage()
+            }
+        })
+        .catch(error => console.error('Catch Error:', error));
+
 
     function getMessage() {
         fetch(http_scheme + "://" + window.location.host + url_api + "/chat/messages?token=" + token, {
@@ -110,12 +117,13 @@
             .then(data => {
                 if (data.access_token) {
                     localStorage.setItem("access_token", data.access_token)
-                    let token = localStorage.getItem("access_token")
-                    console.info(`"access_token:" ${token}`)
+                    token = localStorage.getItem("access_token")
+                    console.info(`"set access_token to localStorage:" ${token}`)
                     const loginForm = document.getElementById('loginForm');
                     loginForm.style.display = 'none';
                     const chatForm = document.getElementById('chatForm');
                     chatForm.style.display = 'block';
+                    getMessage()
                 } else {
                     console.error(data.access_token, response.statusText);
                 }
