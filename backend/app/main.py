@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 
-from api.v1 import item, user, auth
+from api.v1 import item, user, auth, chat
 from core.conf import settings, logger
 from core.database import create_tables
 
@@ -29,6 +29,7 @@ def get_app() -> FastAPI:
     app.include_router(item.router, prefix=settings.api_v1_str)
     app.include_router(user.router, prefix=settings.api_v1_str)
     app.include_router(auth.router, prefix=settings.api_v1_str)
+    app.include_router(chat.router, prefix=settings.api_v1_str)
 
     return app
 

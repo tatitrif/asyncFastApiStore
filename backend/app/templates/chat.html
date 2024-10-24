@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>WebSocket Chat</h1>
+<h3>Hi,</h3>
+<form id="loginForm" onsubmit="loginUser(event)">
+    <input type="text" id="username"/>
+    <input type="password" id="password"/>
+    <button>Login</button>
+</form>
+
+<ul id='messages'>
+</ul>
+<form id="chatForm" onsubmit="sendMessage(event)" style="display: none">
+    <label for="messageSendTo">Message to</label>
+    <select id="messageSendTo" onmouseenter="handleSendToChange(event)">
+        <option value="all">All</option>
+    </select>
+    <label for="messageText"></label>
+    <input type="text" id="messageText" autocomplete="off"/>
+    <button>Send</button>
+</form>
+<script>
+    let ws = null;
+    const url_api = "/api/v1"
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const http_scheme = window.location.protocol === "https:" ? "https" : "http";
+    let token = localStorage.getItem("access_token")
+
+    if (token) {
+        const loginForm = document.getElementById('loginForm');
+        loginForm.style.display = 'none';
+        const chatForm = document.getElementById('chatForm');
+        chatForm.style.display = 'block';
+        getMessage()
+    } else {
+        const loginForm = document.getElementById('loginForm');
+        loginForm.style.display = 'block';
+        const chatForm = document.getElementById('chatForm');
+        chatForm.style.display = 'none';
+
+    }
+
+    function getMessage() {
+        fetch(http_scheme + "://" + window.location.host + url_api + "/chat/messages?token=" + token, {
+            method: 'GET'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.messages_list) {
+                    for (let i = 0; i < data.messages_list.length; i++) {
+                        let messages = document.getElementById('messages');
+                        let message = document.createElement('li');
+                        if (data.messages_list[i].receiver !== null) {
+                            let content = document.createTextNode(
+                                data.messages_list[i].sender.username +
+                                ' написал для ' + data.messages_list[i].receiver.username +
+                                ": " + data.messages_list[i].text);
+                            message.appendChild(content);
+                            messages.appendChild(message);
+                        } else {
+                            let content = document.createTextNode(
+                                data.messages_list[i].sender.username + ' написал для всех' +
+                                ": " + data.messages_list[i].text);
+                            message.appendChild(content);
+                            messages.appendChild(message);
+                        }
+                    }
+
+                    ws = new WebSocket(ws_scheme + "://" + window.location.host + url_api + "/chat/ws?token=" + token);
+                    ws.onmessage = function (event) {
+                        let messages = document.getElementById('messages')
+                        let message = document.createElement('li')
+                        let json_message = JSON.parse(event.data)
+                        if (json_message.receiver === 'all') {
+                            let content = document.createTextNode(
+                                json_message.sender + ' написал для всех' +
+                                ": " + json_message.text);
+                            message.appendChild(content);
+                            messages.appendChild(message);
+                        } else {
+                            let content = document.createTextNode(
+                                json_message.sender + ' написал для ' +
+                                json_message.receiver +
+                                ": " + json_message.text);
+                            message.appendChild(content);
+                            messages.appendChild(message);
+                        }
+                    }
+
+                }
+            })
+    }
+
+    function loginUser(event) {
+        event.preventDefault();
+        let username = document.getElementById('username').value
+        let password = document.getElementById('password').value
+
+
+        let myFormData = new FormData();
+        myFormData.append("username", username);
+        myFormData.append("password", password);
+
+        fetch(http_scheme + "://" + window.location.host + url_api + "/auth/login", {
+            method: 'POST',
+            body: myFormData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.access_token) {
+                    localStorage.setItem("access_token", data.access_token)
+                    let token = localStorage.getItem("access_token")
+                    console.info(`"access_token:" ${token}`)
+                    const loginForm = document.getElementById('loginForm');
+                    loginForm.style.display = 'none';
+                    const chatForm = document.getElementById('chatForm');
+                    chatForm.style.display = 'block';
+                } else {
+                    console.error(data.access_token, response.statusText);
+                }
+            })
+            .catch(error => console.error('Catch Error:', error));
+    }
+
+    function handleSendToChange(event) {
+        event.preventDefault();
+        fetch(http_scheme + "://" + window.location.host + url_api + "/chat/all_users")
+            .then(response => response.json())
+            .then(data => {
+                let optionsToAdd = data.users_list
+                if (optionsToAdd) {
+                    let select = document.getElementById("messageSendTo");
+                    select.innerHTML = ''
+                    let option = document.createElement("option");
+                    option.text = "All";
+                    option.value = "all";
+                    select.add(option);
+                    for (let i = 0; i < optionsToAdd.length; i++) {
+                        let option = document.createElement("option");
+                        option.text = optionsToAdd[i];
+                        option.value = optionsToAdd[i];
+                        select.add(option);
+                    }
+                }
+            })
+    }
+
+    function sendMessage(event) {
+        let send_to = document.getElementById("messageSendTo").value
+        let text = document.getElementById("messageText").value
+        let messageObj = {
+            receiver: send_to,
+            text: text
+        }
+        let jsonMessage = JSON.stringify(messageObj)
+        ws.send(jsonMessage)
+        text.value = ''
+        event.preventDefault()
+    }
+</script>
+{% endblock %}
