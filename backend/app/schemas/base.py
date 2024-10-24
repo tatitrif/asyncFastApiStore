@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from fastapi.responses import ORJSONResponse
-from pydantic import BaseModel
+from pydantic import PlainSerializer, BaseModel
+from typing_extensions import Annotated
 
 
 class PageInfo(BaseModel):
@@ -23,3 +26,11 @@ class IdResponse(BaseModel):
 
 class JSONResponse(ORJSONResponse):
     pass
+
+
+custom_datetime = Annotated[
+    datetime,
+    PlainSerializer(
+        lambda _datetime: _datetime.strftime("%d/%m/%Y, %H:%M:%S"), return_type=str
+    ),
+]

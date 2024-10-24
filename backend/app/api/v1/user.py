@@ -1,14 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dependencies.user import get_current_active_user, check_admin_role
-from dependencies.database import get_db
+import exceptions
 from dao import user as dao
+from dependencies.database import get_db
+from dependencies.user import get_current_active_user, check_admin_role
 from helpers.paginator import pagination
-
 from schemas import user as schemas
 from schemas.base import PageInfo, Page
 
@@ -19,8 +19,8 @@ router = APIRouter(prefix="/users", tags=["users"])
     "/me",
     response_model=schemas.UserResponse,
 )
-async def read_users_me(
-    current_user: Annotated[schemas.UserResponse, Depends(get_current_active_user)],
+def read_user_me(
+    current_user: Annotated[schemas.TokenData, Depends(get_current_active_user)],
 ):
     return current_user
 
@@ -46,9 +46,7 @@ async def _get_one_by_id(user_id: int, session: AsyncSession = Depends(get_db)):
     entity = await dao.UserDAO(session).find_one_or_none(id=user_id, is_active=1)
     if entity:
         return entity
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={user_id}"
-    )
+    raise exceptions.USER_EXCEPTION_NOT_FOUND_USER
 
 
 @router.get(
@@ -63,9 +61,8 @@ async def _get_many(
         **page_params, is_active=1
     )
     if not page_entities:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Page not found"
-        )
+        raise exceptions.USER_EXCEPTION_NOT_FOUND_PAGE
+
     return Page(
         page_info=PageInfo(**pagination_info),
         page_data=[schemas.UserResponse(**entity.__dict__) for entity in page_entities],
@@ -85,16 +82,12 @@ async def _update_one_by_id(
     data = user.model_dump()
     if await dao.UserDAO(session).find_one_or_none(id=user_id, is_active=1):
         return await dao.UserDAO(session).update_one_by_id(user_id, **data)
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={user_id}"
-    )
+    raise exceptions.USER_EXCEPTION_NOT_FOUND_USER
 
 
 @router.delete("/{user_id}", dependencies=[Depends(check_admin_role)])
 async def _delete_by_id(user_id: int, session: AsyncSession = Depends(get_db)):
     if await dao.UserDAO(session).find_one_or_none(id=user_id, is_active=1):
-        if await dao.UserDAO(session).update_one_by_id(_id=user_id, is_active=1):
+        if await dao.UserDAO(session).update_one_by_id(_id=user_id, is_active=None):
             return {"detail": f"Deleted id={user_id}"}
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={user_id}"
-    )
+    raise exceptions.USER_EXCEPTION_NOT_FOUND_USER

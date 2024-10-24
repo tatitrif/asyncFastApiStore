@@ -4,6 +4,7 @@ from logging import config as logging_config
 from pathlib import Path
 
 from pydantic_settings import SettingsConfigDict, BaseSettings
+from starlette.templating import Jinja2Templates
 
 from core.logger import LOGGING
 
@@ -11,6 +12,7 @@ logging_config.dictConfig(LOGGING)
 logger = logging.getLogger()
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
+templates = Jinja2Templates(directory="templates")
 
 
 class Settings(BaseSettings):
@@ -29,7 +31,7 @@ class Settings(BaseSettings):
     api_v1_str: str = "/api/v1"
 
     # uvicorn
-    port: int = 9000
+    port: int = 8000
     reload: bool = False
 
     # db

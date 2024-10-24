@@ -1,19 +1,18 @@
 from typing import Annotated
 
 from fastapi import APIRouter
-from fastapi import HTTPException, status, Depends, Request, Response
+from fastapi import status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import exceptions
 from dao import user as dao
 from dependencies.database import get_db
 from helpers.security import (
     hash_pwd,
-    verify_pwd,
+    create_user_tokens,
     get_user_token,
-    get_token_payload,
-    credentials_exception,
+    authenticate_user,
     oauth2_scheme,
 )
 from schemas import user as schemas
@@ -25,6 +24,7 @@ router = APIRouter(tags=["Auth"], prefix="/auth")
     "/register",
     response_model=schemas.UserResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="User registration",
 )
 async def _create_one(
     info_form: Annotated[schemas.UserRequest, Depends()],
@@ -36,70 +36,78 @@ async def _create_one(
         exist_username = await dao.UserDAO(session).find_one_or_none(
             username=info_form.username
         )
-        exist_email = await dao.UserDAO(session).find_one_or_none(email=info_form.email)
 
         if exist_username:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Username '{info_form.username}' already registered",
+            raise exceptions.AUTH_EXCEPTION_CONFLICT_USERNAME
+
+        if info_form.email:
+            exist_email = await dao.UserDAO(session).find_one_or_none(
+                email=info_form.email
             )
-        if exist_email:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Email '{info_form.email}' already registered",
-            )
+            if exist_email:
+                raise exceptions.AUTH_EXCEPTION_CONFLICT_EMAIL
 
         if pwd_form.password == pwd_form.confirmation_password:
             data["hashed_password"] = hash_pwd(pwd_form.password)
 
         return await dao.UserDAO(session).add_one_and_return(**data)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e,
-        )
+    except Exception:
+        raise exceptions.AUTH_EXCEPTION_CREATE_USER
 
 
 @router.post(
     "/login",
     response_model=schemas.TokenResponse,
+    summary="Create access and refresh tokens for a user",
 )
 async def _login_pwd(
-    response: Response,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
-    user = await dao.UserDAO(session).find_one_or_none(username=form_data.username)
+    user: schemas.TokenData = await authenticate_user(
+        session, form_data.username, form_data.password
+    )
+
     user_token_data = schemas.TokenData(**user.__dict__)
-    if not user or not verify_pwd(form_data.password, user.hashed_password):
-        raise credentials_exception
+    tokens = create_user_tokens(user_token_data)
 
-    tokens = await get_user_token(user_token_data)
-
-    if await dao.UserDAO(session).update_one_by_id(
+    await dao.UserDAO(session).update_one_by_id(
         _id=user.id, refresh_token=tokens.refresh_token
-    ):
-        response.set_cookie(
-            key="refresh_token", value=tokens.refresh_token, httponly=True
-        )
-
+    )
     return tokens
 
 
 @router.post(
     "/refresh",
     response_model=schemas.TokenResponse,
+    summary="Create new access token for user",
 )
 async def refresh_access_token(
-    request: Request,
-    token: str = Depends(oauth2_scheme),
-) -> schemas.UserResponse:
-    try:
-        payload: dict = get_token_payload(token)
-        refresh_token: str = request.cookies.get("refresh_token")
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    user = get_user_token(token)
 
-        user = schemas.TokenData(**payload)
+    user_db = await dao.UserDAO(session).find_one_or_none(username=user.username)
+    if not user_db:
+        raise exceptions.CREDENTIALS_EXCEPTION_USER_DB
+    user_db = schemas.TokenData(**user_db.__dict__)
+    return create_user_tokens(user_db)
 
-        return await get_user_token(user, refresh_token)
-    except InvalidTokenError:
-        raise credentials_exception
+
+@router.post("/logout")
+async def logout(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    user = get_user_token(token)
+
+    user_db = await dao.UserDAO(session).find_one_or_none(username=user.username)
+    if not user_db or not user_db.refresh_token:
+        raise exceptions.CREDENTIALS_EXCEPTION_USER_DB
+    success = await dao.UserDAO(session).update_one_by_id(
+        _id=user_db.id, refresh_token=None
+    )
+    if not success:
+        raise exceptions.CREDENTIALS_EXCEPTION_LOGOUT
+    return "Logout successful"

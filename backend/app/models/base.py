@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import Mapped, mapped_column, declared_attr, DeclarativeBase
@@ -40,6 +39,5 @@ class MappedBase(AsyncAttrs, DeclarativeBase):
 
         return f"<{self.__class__.__name__} {', '.join(cols)}>"
 
-
-class Message(BaseModel):
-    message: str
+    def to_dict(self):
+        return {field.name: getattr(self, field.name) for field in self.__table__.c}

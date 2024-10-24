@@ -21,7 +21,6 @@ class TokenData(IdResponse):
     email: str | None = None
     role: str | None = None
     is_active: bool | None = None
-    refresh_token: str | None = None
 
 
 class User(BaseModel):
@@ -101,7 +100,9 @@ class UserUpdate(BaseModel):
 class UserRequest(UserUpdate, User): ...
 
 
-class UserResponse(UserUpdate, User, IdResponse): ...
+class UserResponse(User, IdResponse):
+    email: str | None = None
+    fullname: str | None = None
 
 
 class UserListResponse:

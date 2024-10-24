@@ -1,12 +1,12 @@
-from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, status, UploadFile, File, Form
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dependencies.user import check_admin_role
-from dependencies.database import get_db
+import exceptions
 from dao import item as dao
+from dependencies.database import get_db
+from dependencies.user import check_admin_role
 from helpers.paginator import pagination
-
 from helpers.upload import handle_file_upload
 from schemas import item as schemas
 from schemas.base import PageInfo, Page
@@ -22,9 +22,7 @@ async def _get_one_by_id(item_id: int, session: AsyncSession = Depends(get_db)):
     entity = await dao.ItemsDAO(session).find_one_or_none(id=item_id)
     if entity:
         return entity
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
-    )
+    raise exceptions.ITEM_EXCEPTION_NOT_FOUND_ITEM
 
 
 @router.get(
@@ -39,9 +37,8 @@ async def _get_many(
         **page_params
     )
     if not page_entities:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Page not found"
-        )
+        raise exceptions.ITEM_EXCEPTION_NOT_FOUND_PAGE
+
     return Page(
         page_info=PageInfo(**pagination_info),
         page_data=[schemas.ItemResponse(**entity.__dict__) for entity in page_entities],
@@ -64,8 +61,8 @@ async def _create_one(
         try:
             file_name = await handle_file_upload(image_file)
             data["image"] = file_name
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        except ValueError:
+            raise exceptions.ITEM_EXCEPTION_IMAGE
     return await dao.ItemsDAO(session).add_one_and_return(**data)
 
 
@@ -93,14 +90,12 @@ async def _update_one_by_id(
             file_name = await handle_file_upload(image_file)
             data["image"] = file_name
 
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        except ValueError:
+            raise exceptions.ITEM_EXCEPTION_IMAGE
 
     if await dao.ItemsDAO(session).find_one_or_none(id=item_id):
         return await dao.ItemsDAO(session).update_one_by_id(item_id, **data)
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
-    )
+    raise exceptions.ITEM_EXCEPTION_NOT_FOUND_ITEM
 
 
 @router.delete(
@@ -111,6 +106,4 @@ async def _delete_by_id(item_id: int, session: AsyncSession = Depends(get_db)):
     if await dao.ItemsDAO(session).find_one_or_none(id=item_id):
         if await dao.ItemsDAO(session).delete(id=item_id):
             return {"detail": f"Deleted id={item_id}"}
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail=f"Not found id={item_id}"
-    )
+    raise exceptions.ITEM_EXCEPTION_NOT_FOUND_ITEM
