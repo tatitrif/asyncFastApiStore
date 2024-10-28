@@ -1,3 +1,4 @@
+backend/app/migrations/versions/*
 backend/app/uploads/*
 backend/app/*.db
 *.idea

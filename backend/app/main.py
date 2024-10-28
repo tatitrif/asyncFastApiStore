@@ -7,13 +7,12 @@ from fastapi.responses import ORJSONResponse
 
 from api.v1 import item, user, auth, chat
 from core.conf import settings, logger
-from core.database import create_tables
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("Start configuring server...")
-    await create_tables()
+
     logger.info("Server started and configured successfully")
     yield
     logger.info("Server shut down")
