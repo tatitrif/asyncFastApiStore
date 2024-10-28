@@ -63,9 +63,9 @@ async def websocket_endpoint(
                 )
                 await manager.send_personal_message(message_obj)
                 if not user:
-                    receiver = user.id
-                else:
                     logger.error(f"{message.receiver} not found")
+                else:
+                    receiver = user.id
 
             await dao.MessageDAO(session).add_one_and_return(
                 receiver_id=receiver, text=message.text, sender_id=current_user.id
